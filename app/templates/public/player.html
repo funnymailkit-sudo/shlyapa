@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}{{ player.name }} — Шляпа{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<div class="flex items-center gap-2 text-sm text-gray-500 mb-6">
+  <a href="/" class="hover:text-gray-300 transition">Таблица</a>
+  <span>/</span>
+  <span class="text-gray-300">{{ player.name }}</span>
+</div>
+
+<!-- Header -->
+<h1 class="text-2xl font-bold text-white mb-6">{{ player.name }}</h1>
+
+<!-- Stats cards -->
+<div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
+    <div class="text-3xl font-bold text-white">{{ total_games }}</div>
+    <div class="text-gray-400 text-xs mt-1">Игр</div>
+  </div>
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
+    <div class="text-3xl font-bold text-violet-400">{{ total_points }}</div>
+    <div class="text-gray-400 text-xs mt-1">Очков</div>
+  </div>
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
+    <div class="text-3xl font-bold text-amber-400">{{ total_wins }}</div>
+    <div class="text-gray-400 text-xs mt-1">Побед</div>
+  </div>
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
+    <div class="text-3xl font-bold {% if win_pct >= 50 %}text-green-400{% else %}text-gray-300{% endif %}">
+      {{ win_pct }}%
+    </div>
+    <div class="text-gray-400 text-xs mt-1">Win%</div>
+  </div>
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center col-span-2 sm:col-span-1">
+    <div class="text-3xl font-bold {% if kpd >= 60 %}text-emerald-400{% elif kpd >= 40 %}text-yellow-400{% else %}text-gray-300{% endif %}">
+      {{ kpd }}%
+    </div>
+    <div class="text-gray-400 text-xs mt-1">КПД</div>
+  </div>
+</div>
+
+<!-- Game history -->
+<h2 class="text-lg font-semibold text-white mb-3">История игр</h2>
+
+{% if not history %}
+  <div class="bg-gray-800 border border-gray-700 rounded-2xl p-8 text-center text-gray-500">
+    Нет игр
+  </div>
+{% else %}
+  <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="bg-gray-800 text-gray-400 uppercase text-xs tracking-wider">
+          <th class="px-4 py-3 text-left">Дата</th>
+          <th class="px-4 py-3 text-left">Место</th>
+          <th class="px-4 py-3 text-left hidden sm:table-cell">Партнёры</th>
+          <th class="px-4 py-3 text-left hidden sm:table-cell">Локация</th>
+          <th class="px-4 py-3 text-right">Место</th>
+          <th class="px-4 py-3 text-right">Очки</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-800">
+        {% for row in history %}
+        <tr class="hover:bg-gray-800/50 transition">
+          <td class="px-4 py-3">
+            <a href="/games/{{ row.game.id }}" class="text-gray-200 hover:text-violet-300 transition">
+              {{ row.game.played_at.strftime('%d.%m.%Y') }}
+            </a>
+          </td>
+          <td class="px-4 py-3 text-gray-400 hidden sm:table-cell">{{ row.game.location.name }}</td>
+          <td class="px-4 py-3 hidden sm:table-cell">
+            {% for t in row.teammates %}
+              <span class="inline-block bg-gray-800 rounded px-1.5 py-0.5 text-gray-300 mr-1">{{ t.name }}</span>
+            {% else %}
+              <span class="text-gray-600">—</span>
+            {% endfor %}
+          </td>
+          <td class="px-4 py-3 text-gray-400 hidden sm:table-cell">{{ row.game.season.label }}</td>
+          <td class="px-4 py-3 text-right">
+            {% if row.team.place == 1 %}
+              <span class="text-amber-400 font-bold">🥇 1</span>
+            {% elif row.team.place == 2 %}
+              <span class="text-gray-300 font-bold">🥈 2</span>
+            {% elif row.team.place == 3 %}
+              <span class="text-amber-700 font-bold">🥉 3</span>
+            {% else %}
+              <span class="text-gray-500">{{ row.team.place }}</span>
+            {% endif %}
+            <span class="text-gray-500 text-xs">/{{ row.n_teams }}</span>
+          </td>
+          <td class="px-4 py-3 text-right">
+            <span class="bg-violet-600/20 text-violet-300 font-bold px-2 py-0.5 rounded-full">{{ row.points }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}

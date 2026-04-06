@@ -2,72 +2,131 @@
 {% block title %}Турнирная таблица — Шляпа{% endblock %}
 
 {% block content %}
-<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-  <div>
-    <h1 class="text-2xl font-bold text-white">Турнирная таблица</h1>
-    {% if current_season %}
-      <p class="text-gray-400 text-sm mt-1">Сезон {{ current_season.label }}</p>
+<h1 class="text-2xl font-bold text-white mb-6">Турнирная таблица</h1>
+
+<!-- Tabs -->
+<div class="flex gap-1 bg-gray-800 rounded-xl p-1 w-fit mb-6">
+  <button onclick="switchTab('quarterly')" id="tab-quarterly"
+    class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition">
+    Квартальная
+  </button>
+  <button onclick="switchTab('alltime')" id="tab-alltime"
+    class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition">
+    За всё время
+  </button>
+</div>
+
+<!-- ── Quarterly Tab ─────────────────────────────────────────────────────── -->
+<div id="pane-quarterly">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+    <p class="text-gray-400 text-sm">
+      {% if current_season %}Сезон <span class="text-gray-200">{{ current_season.label }}</span>{% endif %}
+    </p>
+    {% if seasons %}
+    <form method="get" class="flex items-center gap-2">
+      <input type="hidden" name="tab" value="quarterly">
+      <label class="text-gray-400 text-sm">Сезон:</label>
+      <select name="season_id" onchange="this.form.submit()"
+        class="bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500">
+        {% for s in seasons %}
+          <option value="{{ s.id }}" {% if current_season and s.id == current_season.id %}selected{% endif %}>
+            {{ s.label }}
+          </option>
+        {% endfor %}
+      </select>
+    </form>
     {% endif %}
   </div>
-
-  {% if seasons %}
-  <form method="get" class="flex items-center gap-2">
-    <label class="text-gray-400 text-sm">Сезон:</label>
-    <select name="season_id" onchange="this.form.submit()"
-      class="bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500">
-      {% for s in seasons %}
-        <option value="{{ s.id }}" {% if current_season and s.id == current_season.id %}selected{% endif %}>
-          {{ s.label }}
-        </option>
-      {% endfor %}
-    </select>
-  </form>
+  {% if not seasonal_lb %}
+    <div class="bg-gray-800 border border-gray-700 rounded-2xl p-12 text-center">
+      <p class="text-gray-400">В этом сезоне ещё нет игр.</p>
+      <a href="/admin/games/new" class="mt-3 inline-block text-violet-400 hover:text-violet-300 text-sm">+ Добавить игру</a>
+    </div>
+  {% else %}
+    {{ leaderboard_table(seasonal_lb) }}
   {% endif %}
 </div>
 
-{% if not leaderboard %}
-  <div class="bg-gray-800 border border-gray-700 rounded-2xl p-12 text-center">
-    <p class="text-gray-400 text-lg">В этом сезоне ещё нет игр.</p>
-    <a href="/admin/games/new" class="mt-4 inline-block text-violet-400 hover:text-violet-300 text-sm">
-      + Добавить игру
-    </a>
-  </div>
-{% else %}
-  <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-    <table class="w-full text-sm">
-      <thead>
-        <tr class="bg-gray-800 text-gray-400 uppercase text-xs tracking-wider">
-          <th class="px-4 py-3 text-left w-12">#</th>
-          <th class="px-4 py-3 text-left">Игрок</th>
-          <th class="px-4 py-3 text-right">Игры</th>
-          <th class="px-4 py-3 text-right">Очки</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-800">
-        {% for entry in leaderboard %}
-        <tr class="hover:bg-gray-800/50 transition">
-          <td class="px-4 py-3 font-mono">
-            {% if entry.rank == 1 %}
-              <span class="medal-gold font-bold text-base">🥇</span>
-            {% elif entry.rank == 2 %}
-              <span class="medal-silver font-bold text-base">🥈</span>
-            {% elif entry.rank == 3 %}
-              <span class="medal-bronze font-bold text-base">🥉</span>
-            {% else %}
-              <span class="text-gray-500">{{ entry.rank }}</span>
-            {% endif %}
-          </td>
-          <td class="px-4 py-3 font-medium text-white">{{ entry.player.name }}</td>
-          <td class="px-4 py-3 text-right text-gray-400">{{ entry.games }}</td>
-          <td class="px-4 py-3 text-right">
-            <span class="bg-violet-600/20 text-violet-300 font-bold px-2.5 py-0.5 rounded-full text-sm">
-              {{ entry.points }}
-            </span>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-{% endif %}
+<!-- ── All-time Tab ──────────────────────────────────────────────────────── -->
+<div id="pane-alltime" class="hidden">
+  <p class="text-gray-400 text-sm mb-4">Все сезоны</p>
+  {% if not alltime_lb %}
+    <div class="bg-gray-800 border border-gray-700 rounded-2xl p-12 text-center">
+      <p class="text-gray-400">Ещё нет ни одной игры.</p>
+    </div>
+  {% else %}
+    {{ leaderboard_table(alltime_lb) }}
+  {% endif %}
+</div>
+
+<!-- ── Macro ─────────────────────────────────────────────────────────────── -->
+{% macro leaderboard_table(lb) %}
+<div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="bg-gray-800 text-gray-400 uppercase text-xs tracking-wider">
+        <th class="px-4 py-3 text-left w-10">#</th>
+        <th class="px-4 py-3 text-left">Игрок</th>
+        <th class="px-4 py-3 text-right">Игры</th>
+        <th class="px-4 py-3 text-right">Победы</th>
+        <th class="px-4 py-3 text-right">Win%</th>
+        <th class="px-4 py-3 text-right">КПД</th>
+        <th class="px-4 py-3 text-right">Очки</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-800">
+      {% for e in lb %}
+      <tr class="hover:bg-gray-800/50 transition">
+        <td class="px-4 py-3">
+          {% if e.rank == 1 %}🥇
+          {% elif e.rank == 2 %}🥈
+          {% elif e.rank == 3 %}🥉
+          {% else %}<span class="text-gray-500 font-mono">{{ e.rank }}</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3">
+          <a href="/players/{{ e.player.id }}"
+             class="text-white font-medium hover:text-violet-300 transition">{{ e.player.name }}</a>
+        </td>
+        <td class="px-4 py-3 text-right text-gray-400">{{ e.games }}</td>
+        <td class="px-4 py-3 text-right text-gray-400">{{ e.wins }}</td>
+        <td class="px-4 py-3 text-right">
+          <span class="{% if e.win_pct >= 50 %}text-green-400{% else %}text-gray-400{% endif %}">
+            {{ e.win_pct }}%
+          </span>
+        </td>
+        <td class="px-4 py-3 text-right">
+          <span class="{% if e.kpd >= 60 %}text-emerald-400{% elif e.kpd >= 40 %}text-yellow-400{% else %}text-gray-400{% endif %}">
+            {{ e.kpd }}%
+          </span>
+        </td>
+        <td class="px-4 py-3 text-right">
+          <span class="bg-violet-600/20 text-violet-300 font-bold px-2.5 py-0.5 rounded-full">{{ e.points }}</span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endmacro %}
+
+<script>
+const ACTIVE = 'bg-gray-900 text-white shadow';
+const INACTIVE = 'text-gray-400 hover:text-gray-200';
+const INIT_TAB = '{{ tab }}';
+
+function switchTab(name) {
+  ['quarterly','alltime'].forEach(t => {
+    document.getElementById('pane-' + t).classList.toggle('hidden', t !== name);
+    const btn = document.getElementById('tab-' + t);
+    btn.className = 'tab-btn px-4 py-2 rounded-lg text-sm font-medium transition ' + (t === name ? ACTIVE : INACTIVE);
+  });
+  // Update URL without reload
+  const url = new URL(window.location);
+  url.searchParams.set('tab', name);
+  window.history.replaceState({}, '', url);
+}
+
+switchTab(INIT_TAB);
+</script>
 {% endblock %}

@@ -31,13 +31,19 @@
         <p class="text-gray-400 text-sm mt-3">{{ game.notes }}</p>
       {% endif %}
     </div>
-    <form method="post" action="/admin/games/{{ game.id }}/delete"
-          onsubmit="return confirm('Удалить эту игру?')">
-      <button type="submit"
-        class="text-red-500 hover:text-red-400 text-sm border border-red-900 hover:border-red-700 px-3 py-1.5 rounded-lg transition">
-        Удалить
-      </button>
-    </form>
+    <div class="flex gap-2">
+      <a href="/admin/games/{{ game.id }}/edit"
+        class="text-violet-400 hover:text-violet-300 text-sm border border-violet-800 hover:border-violet-600 px-3 py-1.5 rounded-lg transition">
+        Редактировать
+      </a>
+      <form method="post" action="/admin/games/{{ game.id }}/delete"
+            onsubmit="return confirm('Удалить эту игру?')">
+        <button type="submit"
+          class="text-red-500 hover:text-red-400 text-sm border border-red-900 hover:border-red-700 px-3 py-1.5 rounded-lg transition">
+          Удалить
+        </button>
+      </form>
+    </div>
   </div>
 </div>
 
