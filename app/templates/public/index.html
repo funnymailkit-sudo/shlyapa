@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Турнирная таблица — Шляпа{% endblock %}
+
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+  <div>
+    <h1 class="text-2xl font-bold text-white">Турнирная таблица</h1>
+    {% if current_season %}
+      <p class="text-gray-400 text-sm mt-1">Сезон {{ current_season.label }}</p>
+    {% endif %}
+  </div>
+
+  {% if seasons %}
+  <form method="get" class="flex items-center gap-2">
+    <label class="text-gray-400 text-sm">Сезон:</label>
+    <select name="season_id" onchange="this.form.submit()"
+      class="bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500">
+      {% for s in seasons %}
+        <option value="{{ s.id }}" {% if current_season and s.id == current_season.id %}selected{% endif %}>
+          {{ s.label }}
+        </option>
+      {% endfor %}
+    </select>
+  </form>
+  {% endif %}
+</div>
+
+{% if not leaderboard %}
+  <div class="bg-gray-800 border border-gray-700 rounded-2xl p-12 text-center">
+    <p class="text-gray-400 text-lg">В этом сезоне ещё нет игр.</p>
+    <a href="/admin/games/new" class="mt-4 inline-block text-violet-400 hover:text-violet-300 text-sm">
+      + Добавить игру
+    </a>
+  </div>
+{% else %}
+  <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="bg-gray-800 text-gray-400 uppercase text-xs tracking-wider">
+          <th class="px-4 py-3 text-left w-12">#</th>
+          <th class="px-4 py-3 text-left">Игрок</th>
+          <th class="px-4 py-3 text-right">Игры</th>
+          <th class="px-4 py-3 text-right">Очки</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-800">
+        {% for entry in leaderboard %}
+        <tr class="hover:bg-gray-800/50 transition">
+          <td class="px-4 py-3 font-mono">
+            {% if entry.rank == 1 %}
+              <span class="medal-gold font-bold text-base">🥇</span>
+            {% elif entry.rank == 2 %}
+              <span class="medal-silver font-bold text-base">🥈</span>
+            {% elif entry.rank == 3 %}
+              <span class="medal-bronze font-bold text-base">🥉</span>
+            {% else %}
+              <span class="text-gray-500">{{ entry.rank }}</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3 font-medium text-white">{{ entry.player.name }}</td>
+          <td class="px-4 py-3 text-right text-gray-400">{{ entry.games }}</td>
+          <td class="px-4 py-3 text-right">
+            <span class="bg-violet-600/20 text-violet-300 font-bold px-2.5 py-0.5 rounded-full text-sm">
+              {{ entry.points }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}
