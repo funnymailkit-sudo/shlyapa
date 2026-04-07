@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.database import Game, Player, Season, TeamPlayer, get_db
+from app.database import Game, Player, Season, Team, TeamPlayer, get_db
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -110,8 +110,8 @@ def player_detail(request: Request, player_id: int, db: Session = Depends(get_db
     rows = (
         db.query(TeamPlayer)
         .filter_by(player_id=player_id)
-        .join(TeamPlayer.team)
-        .join(TeamPlayer.team.property.mapper.class_.game)
+        .join(Team, TeamPlayer.team_id == Team.id)
+        .join(Game, Team.game_id == Game.id)
         .all()
     )
 

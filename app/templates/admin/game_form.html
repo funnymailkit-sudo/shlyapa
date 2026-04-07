@@ -15,14 +15,19 @@
   </div>
 </div>
 
-<!-- Error banner -->
+<!-- Server-side or JS error banner -->
+{% if error %}
+<div class="bg-red-900/30 border border-red-700/50 text-red-300 rounded-xl px-4 py-3 mb-5 text-sm flex items-center gap-2">
+  <span>⚠️</span><span>{{ error }}</span>
+</div>
+{% endif %}
 <div id="errorBanner" class="hidden bg-red-900/30 border border-red-700/50 text-red-300 rounded-xl px-4 py-3 mb-5 text-sm flex items-center gap-2">
   <span>⚠️</span><span id="errorText"></span>
 </div>
 
 <form id="gameForm" method="post" action="{{ form_action }}" class="flex flex-col gap-5">
 
-  <!-- ── Section 1: Basic info ─────────────────────────────────────────── -->
+  <!-- ── 1. Основная информация ────────────────────────────────────────── -->
   <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
     <div class="bg-gray-800/50 px-5 py-3 border-b border-gray-800">
       <h2 class="font-semibold text-white text-sm">1. Основная информация</h2>
@@ -61,19 +66,19 @@
     </div>
   </div>
 
-  <!-- ── Section 2: Teams ──────────────────────────────────────────────── -->
+  <!-- ── 2. Команды ────────────────────────────────────────────────────── -->
   <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
     <div class="bg-gray-800/50 px-5 py-3 border-b border-gray-800 flex items-center justify-between">
       <h2 class="font-semibold text-white text-sm">2. Команды</h2>
       <button type="button" id="addTeamBtn"
-        class="bg-violet-900/40 hover:bg-violet-900/60 border border-violet-700/50 text-violet-300
-               text-xs font-medium px-3 py-1.5 rounded-lg transition">
+        class="bg-violet-900/40 hover:bg-violet-900/70 border border-violet-700/50
+               text-violet-300 text-xs font-medium px-3 py-1.5 rounded-lg transition">
         + Добавить команду
       </button>
     </div>
     <div class="p-5">
       <div id="teamsContainer" class="flex flex-col gap-3"></div>
-      <p id="teamsEmpty" class="text-gray-600 text-sm text-center py-6 hidden">
+      <p id="noTeamsMsg" class="text-gray-600 text-sm text-center py-6 hidden">
         Нажмите «Добавить команду» ↑
       </p>
     </div>
@@ -81,206 +86,287 @@
 
   <input type="hidden" name="teams_json" id="teamsJson" value="[]">
 
-  <!-- ── Actions ───────────────────────────────────────────────────────── -->
   <div class="flex gap-3">
     <button type="submit"
-      class="bg-violet-600 hover:bg-violet-500 text-white font-bold px-6 py-2.5 rounded-xl transition glow-violet">
+      class="bg-violet-600 hover:bg-violet-500 text-white font-bold px-6 py-2.5 rounded-xl transition">
       {% if existing_game %}Сохранить изменения{% else %}Сохранить игру{% endif %}
     </button>
     <a href="{% if existing_game %}/games/{{ existing_game.id }}{% else %}/admin{% endif %}"
-       class="text-gray-500 hover:text-gray-200 px-4 py-2.5 rounded-xl transition text-sm border border-gray-800 hover:border-gray-700">
+       class="text-gray-500 hover:text-gray-200 px-4 py-2.5 rounded-xl transition text-sm
+              border border-gray-800 hover:border-gray-700">
       Отмена
     </a>
   </div>
 </form>
 
-<!-- ── JS ────────────────────────────────────────────────────────────────── -->
 <script>
+// ── Data ──────────────────────────────────────────────────────────────────────
 const PLAYERS = [
   {% for p in players %}{ id: {{ p.id }}, name: {{ p.name | tojson }} }{% if not loop.last %},{% endif %}{% endfor %}
 ];
 const EXISTING = {{ existing_teams_json | safe }};
 
+// ── State ─────────────────────────────────────────────────────────────────────
 let teamCounter = 0;
-const playerOwner = {}; // pid → teamIdx
+const usedBy = {};   // playerId → teamIdx that owns it
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Errors ────────────────────────────────────────────────────────────────────
 function showError(msg) {
+  const el = document.getElementById('errorBanner');
   document.getElementById('errorText').textContent = msg;
-  const b = document.getElementById('errorBanner');
-  b.classList.remove('hidden');
-  b.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  el.classList.remove('hidden');
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
-function hideError() { document.getElementById('errorBanner').classList.add('hidden'); }
+function hideError() {
+  document.getElementById('errorBanner').classList.add('hidden');
+}
 
-function getInitials(name) {
-  const parts = name.trim().split(' ');
+// ── Avatar ────────────────────────────────────────────────────────────────────
+function hue(id) { return (id * 137) % 360; }
+function initials(name) {
+  const parts = name.trim().split(/\s+/);
   return parts.length >= 2
     ? (parts[0][0] + parts[1][0]).toUpperCase()
     : name[0].toUpperCase();
 }
-function getHue(id) { return (id * 137) % 360; }
-
-function avatarHTML(player, size = 24) {
+function avatarEl(player, size) {
   const fs = Math.max(9, Math.floor(size * 0.42));
-  return `<div style="width:${size}px;height:${size}px;min-width:${size}px;background:hsl(${getHue(player.id)},60%,42%);"
-    class="rounded-full flex items-center justify-center font-bold text-white shrink-0 select-none ring-2 ring-white/10"
-    title="${player.name}">
-    <span style="font-size:${fs}px;line-height:1">${getInitials(player.name)}</span>
-  </div>`;
+  const d = document.createElement('div');
+  d.style.cssText = `width:${size}px;height:${size}px;min-width:${size}px;` +
+                    `background:hsl(${hue(player.id)},60%,42%);`;
+  d.className = 'rounded-full flex items-center justify-center font-bold text-white shrink-0 select-none ring-2 ring-white/10';
+  d.title = player.name;
+  const s = document.createElement('span');
+  s.style.cssText = `font-size:${fs}px;line-height:1`;
+  s.textContent = initials(player.name);
+  d.appendChild(s);
+  return d;
 }
 
-function refreshSelect(teamIdx) {
-  const sel = document.getElementById(`playerSelect-${teamIdx}`);
+// ── Player dropdown (rebuild available options) ───────────────────────────────
+function rebuildSelect(teamIdx) {
+  const sel = document.getElementById('sel-' + teamIdx);
   if (!sel) return;
+  const cur = parseInt(sel.value) || 0;
   sel.innerHTML = '<option value="">— выбрать игрока —</option>';
   PLAYERS.forEach(p => {
-    if (!(p.id in playerOwner)) {
+    if (!(p.id in usedBy) || usedBy[p.id] === teamIdx) {
       const o = document.createElement('option');
-      o.value = p.id; o.textContent = p.name;
+      o.value = p.id;
+      o.textContent = p.name;
+      if (p.id === cur) o.selected = true;
       sel.appendChild(o);
     }
   });
 }
-function refreshAllSelects() {
-  document.querySelectorAll('[id^="playerSelect-"]').forEach(s => {
-    refreshSelect(parseInt(s.id.replace('playerSelect-', '')));
+function rebuildAllSelects() {
+  document.querySelectorAll('[id^="sel-"]').forEach(s => {
+    rebuildSelect(parseInt(s.id.slice(4)));
   });
 }
 
-function addChip(teamIdx, player) {
-  const c = document.getElementById(`chips-${teamIdx}`);
+// ── Add / remove player chip ──────────────────────────────────────────────────
+function addPlayerToTeam(teamIdx, player) {
+  if (player.id in usedBy) return;
+  usedBy[player.id] = teamIdx;
+
+  const wrap = document.getElementById('chips-' + teamIdx);
   const chip = document.createElement('div');
-  chip.id = `chip-${teamIdx}-${player.id}`;
-  chip.dataset.playerId = player.id;
+  chip.id = 'chip-' + teamIdx + '-' + player.id;
+  chip.dataset.pid = player.id;
   chip.className = 'flex items-center gap-1.5 bg-gray-800 border border-gray-700 rounded-xl px-2.5 py-1.5';
-  chip.innerHTML = `
-    ${avatarHTML(player, 20)}
-    <span class="text-sm text-gray-200">${player.name}</span>
-    <button type="button" onclick="removePlayer(${teamIdx},${player.id})"
-      class="ml-1 text-gray-600 hover:text-red-400 transition text-xs leading-none">✕</button>
-  `;
-  c.appendChild(chip);
+
+  chip.appendChild(avatarEl(player, 20));
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'text-sm text-gray-200';
+  nameSpan.textContent = player.name;
+  chip.appendChild(nameSpan);
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'ml-1 text-gray-600 hover:text-red-400 transition text-xs leading-none';
+  btn.textContent = '✕';
+  btn.onclick = () => removePlayerFromTeam(teamIdx, player.id);
+  chip.appendChild(btn);
+
+  wrap.appendChild(chip);
+  rebuildAllSelects();
+
+  // Reset select back to placeholder
+  const sel = document.getElementById('sel-' + teamIdx);
+  if (sel) sel.value = '';
 }
 
-function addPlayer(teamIdx) {
-  const sel = document.getElementById(`playerSelect-${teamIdx}`);
-  const pid = parseInt(sel.value);
-  if (!pid) return;
-  const player = PLAYERS.find(p => p.id === pid);
-  if (!player) return;
-  if (pid in playerOwner) { showError(`«${player.name}» уже в другой команде.`); sel.value=''; return; }
-  hideError();
-  playerOwner[pid] = teamIdx;
-  addChip(teamIdx, player);
-  sel.value = '';
-  refreshAllSelects();
+function removePlayerFromTeam(teamIdx, playerId) {
+  delete usedBy[playerId];
+  const chip = document.getElementById('chip-' + teamIdx + '-' + playerId);
+  if (chip) chip.remove();
+  rebuildAllSelects();
 }
 
-function removePlayer(teamIdx, playerId) {
-  delete playerOwner[playerId];
-  document.getElementById(`chip-${teamIdx}-${playerId}`)?.remove();
-  refreshAllSelects();
-}
-
+// ── Add team block ────────────────────────────────────────────────────────────
 function addTeam(preload) {
   teamCounter++;
   const idx = teamCounter;
-  document.getElementById('teamsEmpty').classList.add('hidden');
 
-  const noPlayers = PLAYERS.length === 0;
-  const div = document.createElement('div');
-  div.id = `team-${idx}`;
-  div.className = 'bg-gray-800/50 border border-gray-700 rounded-xl p-4';
-  div.innerHTML = `
-    <div class="flex items-center justify-between mb-3">
-      <div class="flex items-center gap-2">
-        <span class="w-6 h-6 bg-gray-700 rounded-lg flex items-center justify-center text-gray-400 text-xs font-bold">${idx}</span>
-        <input type="text" id="teamName-${idx}" placeholder="Название команды (необяз.)"
-          class="bg-transparent text-gray-200 text-sm placeholder-gray-600 border-b border-transparent
-                 hover:border-gray-600 focus:border-violet-500 focus:outline-none pb-0.5 transition w-48">
-      </div>
-      <div class="flex items-center gap-3">
-        <div class="flex items-center gap-1.5">
-          <label class="text-gray-500 text-xs">Место:</label>
-          <input type="number" id="teamPlace-${idx}" min="1" value="${idx}"
-            class="w-14 bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 text-gray-200 text-sm text-center
-                   focus:outline-none focus:ring-2 focus:ring-violet-500">
-        </div>
-        <button type="button" onclick="removeTeam(${idx})"
-          class="text-gray-600 hover:text-red-400 text-xs transition px-2 py-1">✕</button>
-      </div>
-    </div>
-    <div>
-      <div id="chips-${idx}" class="flex flex-wrap gap-2 mb-2 min-h-[32px]"></div>
-      ${noPlayers
-        ? '<p class="text-gray-600 text-xs">Сначала <a href="/admin/players" class="underline text-violet-500">добавьте игроков</a>.</p>'
-        : `<div class="flex gap-2">
-            <select id="playerSelect-${idx}"
-              class="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-gray-400 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer">
-              <option value="">— выбрать игрока —</option>
-            </select>
-            <button type="button" onclick="addPlayer(${idx})"
-              class="bg-gray-900 hover:bg-gray-800 border border-gray-700 hover:border-violet-600
-                     text-gray-300 text-sm px-4 py-2 rounded-xl transition font-medium">
-              +
-            </button>
-          </div>`
+  document.getElementById('noTeamsMsg').classList.add('hidden');
+
+  const wrap = document.createElement('div');
+  wrap.id = 'teamBlock-' + idx;
+  wrap.className = 'bg-gray-800/50 border border-gray-700 rounded-xl p-4';
+
+  // ── Header row ──
+  const hdr = document.createElement('div');
+  hdr.className = 'flex items-center justify-between mb-3';
+
+  const left = document.createElement('div');
+  left.className = 'flex items-center gap-2';
+
+  const num = document.createElement('span');
+  num.className = 'w-6 h-6 bg-gray-700 rounded-lg flex items-center justify-center text-gray-400 text-xs font-bold shrink-0';
+  num.textContent = idx;
+  left.appendChild(num);
+
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.id = 'tname-' + idx;
+  nameInput.placeholder = 'Название команды (необяз.)';
+  nameInput.className = 'bg-transparent text-gray-200 text-sm placeholder-gray-600 border-b border-transparent hover:border-gray-600 focus:border-violet-500 focus:outline-none pb-0.5 transition w-44 sm:w-56';
+  left.appendChild(nameInput);
+  hdr.appendChild(left);
+
+  const right = document.createElement('div');
+  right.className = 'flex items-center gap-3 shrink-0';
+
+  const placeLabel = document.createElement('label');
+  placeLabel.className = 'text-gray-500 text-xs';
+  placeLabel.textContent = 'Место:';
+  right.appendChild(placeLabel);
+
+  const placeInput = document.createElement('input');
+  placeInput.type = 'number';
+  placeInput.id = 'tplace-' + idx;
+  placeInput.min = '1';
+  placeInput.value = idx;
+  placeInput.className = 'w-14 bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 text-gray-200 text-sm text-center focus:outline-none focus:ring-2 focus:ring-violet-500';
+  right.appendChild(placeInput);
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'text-gray-600 hover:text-red-400 text-xs transition px-1';
+  removeBtn.textContent = '✕ Убрать';
+  removeBtn.onclick = () => removeTeam(idx);
+  right.appendChild(removeBtn);
+  hdr.appendChild(right);
+  wrap.appendChild(hdr);
+
+  // ── Chips + select ──
+  const chips = document.createElement('div');
+  chips.id = 'chips-' + idx;
+  chips.className = 'flex flex-wrap gap-2 mb-2 min-h-8';
+  wrap.appendChild(chips);
+
+  if (PLAYERS.length === 0) {
+    const msg = document.createElement('p');
+    msg.className = 'text-gray-600 text-xs';
+    msg.innerHTML = 'Сначала <a href="/admin/players" class="underline text-violet-500">добавьте игроков</a>.';
+    wrap.appendChild(msg);
+  } else {
+    const sel = document.createElement('select');
+    sel.id = 'sel-' + idx;
+    sel.className = 'w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer mt-1';
+
+    // Auto-add player when selection changes
+    sel.onchange = () => {
+      const pid = parseInt(sel.value);
+      if (!pid) return;
+      const player = PLAYERS.find(p => p.id === pid);
+      if (!player) return;
+      if (player.id in usedBy && usedBy[player.id] !== idx) {
+        showError(`«${player.name}» уже в другой команде.`);
+        sel.value = '';
+        return;
       }
-    </div>
-  `;
-  document.getElementById('teamsContainer').appendChild(div);
-  refreshSelect(idx);
+      hideError();
+      addPlayerToTeam(idx, player);
+    };
 
+    wrap.appendChild(sel);
+    rebuildSelect(idx);
+  }
+
+  document.getElementById('teamsContainer').appendChild(wrap);
+
+  // Pre-populate if editing
   if (preload) {
-    if (preload.name) document.getElementById(`teamName-${idx}`).value = preload.name;
-    document.getElementById(`teamPlace-${idx}`).value = preload.place;
+    if (preload.name) nameInput.value = preload.name;
+    placeInput.value = preload.place;
     (preload.player_ids || []).forEach(pid => {
-      const p = PLAYERS.find(x => x.id === pid);
-      if (!p) return;
-      playerOwner[pid] = idx;
-      addChip(idx, p);
+      const p = PLAYERS.find(x => x.id == pid);
+      if (p) addPlayerToTeam(idx, p);
     });
-    refreshAllSelects();
   }
 }
 
+// ── Remove team block ─────────────────────────────────────────────────────────
 function removeTeam(idx) {
-  const el = document.getElementById(`team-${idx}`);
-  if (!el) return;
-  Object.keys(playerOwner).forEach(pid => {
-    if (playerOwner[pid] === idx) delete playerOwner[parseInt(pid)];
+  // Free all players owned by this team
+  Object.keys(usedBy).forEach(pid => {
+    if (usedBy[pid] === idx) delete usedBy[parseInt(pid)];
   });
-  el.remove();
-  refreshAllSelects();
-  if (document.getElementById('teamsContainer').children.length === 0)
-    document.getElementById('teamsEmpty').classList.remove('hidden');
+  const el = document.getElementById('teamBlock-' + idx);
+  if (el) el.remove();
+  rebuildAllSelects();
+  if (document.getElementById('teamsContainer').children.length === 0) {
+    document.getElementById('noTeamsMsg').classList.remove('hidden');
+  }
 }
 
-// ── Submit ───────────────────────────────────────────────────────────────────
-document.getElementById('gameForm').addEventListener('submit', function(e) {
+// ── Form submit ───────────────────────────────────────────────────────────────
+document.getElementById('gameForm').addEventListener('submit', function (e) {
   hideError();
   const teams = [];
-  document.querySelectorAll('[id^="team-"]').forEach(el => {
-    const idx = parseInt(el.id.replace('team-', ''));
-    const name  = document.getElementById(`teamName-${idx}`)?.value || '';
-    const place = parseInt(document.getElementById(`teamPlace-${idx}`)?.value || '0');
-    const playerIds = [...el.querySelectorAll('[id^="chip-"]')].map(c => parseInt(c.dataset.playerId));
+
+  document.querySelectorAll('[id^="teamBlock-"]').forEach(el => {
+    const idx = parseInt(el.id.slice(10));  // "teamBlock-".length == 10
+    const name  = (document.getElementById('tname-'  + idx)?.value || '').trim();
+    const place = parseInt(document.getElementById('tplace-' + idx)?.value || '0');
+    const playerIds = [...el.querySelectorAll('[id^="chip-"]')]
+      .map(c => parseInt(c.dataset.pid));
     teams.push({ name, place, player_ids: playerIds });
   });
 
-  if (!teams.length)                            { e.preventDefault(); showError('Добавьте хотя бы одну команду.'); return; }
-  if (new Set(teams.map(t=>t.place)).size !== teams.length) { e.preventDefault(); showError('Два места не могут совпадать.'); return; }
-  const allPids = teams.flatMap(t => t.player_ids);
-  if (new Set(allPids).size !== allPids.length) { e.preventDefault(); showError('Один игрок не может быть в двух командах.'); return; }
+  if (teams.length === 0) {
+    e.preventDefault();
+    showError('Добавьте хотя бы одну команду.');
+    return;
+  }
+  const places = teams.map(t => t.place);
+  if (new Set(places).size !== places.length) {
+    e.preventDefault();
+    showError('Два места не могут совпадать. Проверьте поля «Место».');
+    return;
+  }
+  for (const t of teams) {
+    if (t.player_ids.length === 0) {
+      e.preventDefault();
+      showError(`В команде «${t.name || 'без названия'}» нет игроков. Выберите хотя бы одного.`);
+      return;
+    }
+  }
 
   document.getElementById('teamsJson').value = JSON.stringify(teams);
 });
 
-// ── Init ─────────────────────────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────────────────────────
 document.getElementById('addTeamBtn').addEventListener('click', () => addTeam(null));
-if (EXISTING.length > 0) EXISTING.forEach(t => addTeam(t));
-else { addTeam(null); addTeam(null); }
+
+if (EXISTING.length > 0) {
+  EXISTING.forEach(t => addTeam(t));
+} else {
+  addTeam(null);
+  addTeam(null);
+}
 </script>
 {% endblock %}
