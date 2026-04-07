@@ -1,13 +1,23 @@
+import os
 from datetime import datetime
 
 from sqlalchemy import (Column, DateTime, ForeignKey, Integer, String, Text,
                         create_engine)
 from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./shlyapa.db"
+# Use DATABASE_URL env var in production (PostgreSQL on Supabase/Render),
+# fall back to local SQLite for development.
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./shlyapa.db")
+
+# Supabase/Heroku sometimes give postgres:// — SQLAlchemy needs postgresql://
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+_is_sqlite = DATABASE_URL.startswith("sqlite")
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if _is_sqlite else {},
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
