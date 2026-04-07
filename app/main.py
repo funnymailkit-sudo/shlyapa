@@ -9,7 +9,11 @@ from markupsafe import Markup
 from app.database import Base, DATABASE_URL, engine
 from app.routers import admin, public
 
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as _e:
+    import sys
+    print(f"[WARNING] Could not create tables: {_e}", file=sys.stderr)
 
 app = FastAPI(title="Шляпа — Турнирная таблица")
 app.include_router(public.router)
