@@ -147,14 +147,12 @@ function avatarEl(player, size) {
 function rebuildSelect(teamIdx) {
   const sel = document.getElementById('sel-' + teamIdx);
   if (!sel) return;
-  const cur = parseInt(sel.value) || 0;
   sel.innerHTML = '<option value="">— выбрать игрока —</option>';
   PLAYERS.forEach(p => {
-    if (!(p.id in usedBy) || usedBy[p.id] === teamIdx) {
+    if (!(p.id in usedBy)) {   // только игроки без команды
       const o = document.createElement('option');
       o.value = p.id;
       o.textContent = p.name;
-      if (p.id === cur) o.selected = true;
       sel.appendChild(o);
     }
   });
@@ -293,10 +291,13 @@ function addTeam(preload) {
     };
 
     wrap.appendChild(sel);
-    rebuildSelect(idx);
   }
 
+  // ← Сначала добавляем wrap в DOM, потом работаем с getElementById
   document.getElementById('teamsContainer').appendChild(wrap);
+
+  // Теперь можно безопасно заполнить опции
+  rebuildSelect(idx);
 
   // Pre-populate if editing
   if (preload) {
