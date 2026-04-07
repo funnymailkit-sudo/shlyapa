@@ -1,141 +1,166 @@
-{% extends "base.html" %}
-{% block title %}{% if existing_game %}Редактировать игру{% else %}Новая игра{% endif %} — Шляпа{% endblock %}
+{% extends "admin/base.html" %}
+{% from "macros.html" import avatar %}
+{% block title %}{% if existing_game %}Редактировать игру{% else %}Новая игра{% endif %} — Шляпа Admin{% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-between mb-8">
-  <h1 class="text-2xl font-bold text-white">
-    {% if existing_game %}Редактировать игру{% else %}Новая игра{% endif %}
-  </h1>
-  <a href="/admin" class="text-gray-400 hover:text-gray-200 text-sm transition">← Назад</a>
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-xl font-extrabold text-white">
+      {% if existing_game %}Редактировать игру{% else %}Новая игра{% endif %}
+    </h1>
+    <p class="text-gray-500 text-sm mt-0.5">
+      {% if existing_game %}{{ existing_game.played_at.strftime('%d.%m.%Y') }} · {{ existing_game.location.name }}
+      {% else %}Внесите результаты игры{% endif %}
+    </p>
+  </div>
 </div>
 
-<!-- Error banner (shown via JS) -->
-<div id="errorBanner" class="hidden bg-red-900/40 border border-red-700 text-red-300 rounded-xl px-4 py-3 mb-4 text-sm"></div>
+<!-- Error banner -->
+<div id="errorBanner" class="hidden bg-red-900/30 border border-red-700/50 text-red-300 rounded-xl px-4 py-3 mb-5 text-sm flex items-center gap-2">
+  <span>⚠️</span><span id="errorText"></span>
+</div>
 
-<form id="gameForm" method="post" action="{{ form_action }}" class="flex flex-col gap-6">
+<form id="gameForm" method="post" action="{{ form_action }}" class="flex flex-col gap-5">
 
-  <!-- Basic info -->
-  <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 grid sm:grid-cols-2 gap-4">
-    <div>
-      <label class="block text-gray-400 text-sm mb-1">Локация *</label>
-      {% if not locations %}
-        <p class="text-red-400 text-sm">Сначала <a href="/admin/locations" class="underline">добавьте локацию</a>.</p>
-      {% else %}
-        <select name="location_id" required
-          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-100
-                 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm">
-          {% for loc in locations %}
-            <option value="{{ loc.id }}"
-              {% if existing_game and existing_game.location_id == loc.id %}selected{% endif %}>
-              {{ loc.name }}
-            </option>
-          {% endfor %}
-        </select>
-      {% endif %}
+  <!-- ── Section 1: Basic info ─────────────────────────────────────────── -->
+  <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+    <div class="bg-gray-800/50 px-5 py-3 border-b border-gray-800">
+      <h2 class="font-semibold text-white text-sm">1. Основная информация</h2>
     </div>
-    <div>
-      <label class="block text-gray-400 text-sm mb-1">Дата игры *</label>
-      <input type="date" name="played_at" value="{{ today }}" required
-        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-100
-               focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm">
-    </div>
-    <div class="sm:col-span-2">
-      <label class="block text-gray-400 text-sm mb-1">Примечания</label>
-      <input type="text" name="notes" value="{{ existing_game.notes if existing_game else '' }}"
-             placeholder="Необязательно"
-        class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-100
-               placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm">
+    <div class="p-5 grid sm:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-gray-500 text-xs font-medium mb-1.5 uppercase tracking-wide">Локация *</label>
+        {% if not locations %}
+          <p class="text-red-400 text-sm">Сначала <a href="/admin/locations" class="underline">добавьте локацию</a>.</p>
+        {% else %}
+          <select name="location_id" required
+            class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3.5 py-2.5 text-gray-200
+                   focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm cursor-pointer transition">
+            {% for loc in locations %}
+              <option value="{{ loc.id }}"
+                {% if existing_game and existing_game.location_id == loc.id %}selected{% endif %}>
+                {{ loc.name }}{% if loc.address %} — {{ loc.address }}{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        {% endif %}
+      </div>
+      <div>
+        <label class="block text-gray-500 text-xs font-medium mb-1.5 uppercase tracking-wide">Дата игры *</label>
+        <input type="date" name="played_at" value="{{ today }}" required
+          class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3.5 py-2.5 text-gray-200
+                 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm transition">
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-gray-500 text-xs font-medium mb-1.5 uppercase tracking-wide">Примечания</label>
+        <input type="text" name="notes" value="{{ existing_game.notes if existing_game else '' }}"
+               placeholder="Необязательно"
+          class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3.5 py-2.5 text-gray-200
+                 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm transition">
+      </div>
     </div>
   </div>
 
-  <!-- Teams builder -->
-  <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-white">Команды</h2>
+  <!-- ── Section 2: Teams ──────────────────────────────────────────────── -->
+  <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+    <div class="bg-gray-800/50 px-5 py-3 border-b border-gray-800 flex items-center justify-between">
+      <h2 class="font-semibold text-white text-sm">2. Команды</h2>
       <button type="button" id="addTeamBtn"
-        class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 text-sm px-3 py-1.5 rounded-lg transition">
+        class="bg-violet-900/40 hover:bg-violet-900/60 border border-violet-700/50 text-violet-300
+               text-xs font-medium px-3 py-1.5 rounded-lg transition">
         + Добавить команду
       </button>
     </div>
-    <div id="teamsContainer" class="flex flex-col gap-4"></div>
-    <p id="teamsEmpty" class="text-gray-500 text-sm text-center py-4 hidden">
-      Нажмите «Добавить команду»
-    </p>
+    <div class="p-5">
+      <div id="teamsContainer" class="flex flex-col gap-3"></div>
+      <p id="teamsEmpty" class="text-gray-600 text-sm text-center py-6 hidden">
+        Нажмите «Добавить команду» ↑
+      </p>
+    </div>
   </div>
 
   <input type="hidden" name="teams_json" id="teamsJson" value="[]">
 
+  <!-- ── Actions ───────────────────────────────────────────────────────── -->
   <div class="flex gap-3">
     <button type="submit"
-      class="bg-violet-600 hover:bg-violet-700 text-white font-semibold px-6 py-2.5 rounded-xl transition">
+      class="bg-violet-600 hover:bg-violet-500 text-white font-bold px-6 py-2.5 rounded-xl transition glow-violet">
       {% if existing_game %}Сохранить изменения{% else %}Сохранить игру{% endif %}
     </button>
     <a href="{% if existing_game %}/games/{{ existing_game.id }}{% else %}/admin{% endif %}"
-       class="text-gray-400 hover:text-gray-200 px-4 py-2.5 rounded-xl transition text-sm">
+       class="text-gray-500 hover:text-gray-200 px-4 py-2.5 rounded-xl transition text-sm border border-gray-800 hover:border-gray-700">
       Отмена
     </a>
   </div>
 </form>
 
+<!-- ── JS ────────────────────────────────────────────────────────────────── -->
 <script>
-// ── Data from server ────────────────────────────────────────────────────────
 const PLAYERS = [
-  {% for p in players %}
-  { id: {{ p.id }}, name: {{ p.name | tojson }} }{% if not loop.last %},{% endif %}
-  {% endfor %}
+  {% for p in players %}{ id: {{ p.id }}, name: {{ p.name | tojson }} }{% if not loop.last %},{% endif %}{% endfor %}
 ];
 const EXISTING = {{ existing_teams_json | safe }};
 
-// ── State ───────────────────────────────────────────────────────────────────
 let teamCounter = 0;
-// Map: playerId → teamIdx that owns it
-const playerOwner = {};
+const playerOwner = {}; // pid → teamIdx
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function showError(msg) {
-  const el = document.getElementById('errorBanner');
-  el.textContent = msg;
-  el.classList.remove('hidden');
-  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  document.getElementById('errorText').textContent = msg;
+  const b = document.getElementById('errorBanner');
+  b.classList.remove('hidden');
+  b.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
-function hideError() {
-  document.getElementById('errorBanner').classList.add('hidden');
+function hideError() { document.getElementById('errorBanner').classList.add('hidden'); }
+
+function getInitials(name) {
+  const parts = name.trim().split(' ');
+  return parts.length >= 2
+    ? (parts[0][0] + parts[1][0]).toUpperCase()
+    : name[0].toUpperCase();
+}
+function getHue(id) { return (id * 137) % 360; }
+
+function avatarHTML(player, size = 24) {
+  const fs = Math.max(9, Math.floor(size * 0.42));
+  return `<div style="width:${size}px;height:${size}px;min-width:${size}px;background:hsl(${getHue(player.id)},60%,42%);"
+    class="rounded-full flex items-center justify-center font-bold text-white shrink-0 select-none ring-2 ring-white/10"
+    title="${player.name}">
+    <span style="font-size:${fs}px;line-height:1">${getInitials(player.name)}</span>
+  </div>`;
 }
 
 function refreshSelect(teamIdx) {
   const sel = document.getElementById(`playerSelect-${teamIdx}`);
   if (!sel) return;
-  const current = sel.value;
-  // Build option list: unowned players + the currently selected value (placeholder)
   sel.innerHTML = '<option value="">— выбрать игрока —</option>';
   PLAYERS.forEach(p => {
-    if (!(p.id in playerOwner) || playerOwner[p.id] === teamIdx) {
-      // Skip players owned by OTHER teams, but keep ones owned by this team so they show in list
-      if (!(p.id in playerOwner)) {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = p.name;
-        sel.appendChild(opt);
-      }
+    if (!(p.id in playerOwner)) {
+      const o = document.createElement('option');
+      o.value = p.id; o.textContent = p.name;
+      sel.appendChild(o);
     }
   });
 }
-
 function refreshAllSelects() {
-  document.querySelectorAll('[id^="playerSelect-"]').forEach(sel => {
-    const idx = parseInt(sel.id.replace('playerSelect-', ''));
-    refreshSelect(idx);
+  document.querySelectorAll('[id^="playerSelect-"]').forEach(s => {
+    refreshSelect(parseInt(s.id.replace('playerSelect-', '')));
   });
 }
 
-function addChip(teamIdx, playerId, playerName) {
-  const container = document.getElementById(`chips-${teamIdx}`);
-  const chip = document.createElement('span');
-  chip.id = `chip-${teamIdx}-${playerId}`;
-  chip.className = 'inline-flex items-center gap-1.5 bg-violet-700/30 border border-violet-600/40 text-violet-200 text-sm px-3 py-1 rounded-full';
-  chip.dataset.playerId = playerId;
-  chip.innerHTML = `${playerName} <button type="button" onclick="removePlayer(${teamIdx},${playerId})" class="text-violet-400 hover:text-red-400 transition leading-none">✕</button>`;
-  container.appendChild(chip);
+function addChip(teamIdx, player) {
+  const c = document.getElementById(`chips-${teamIdx}`);
+  const chip = document.createElement('div');
+  chip.id = `chip-${teamIdx}-${player.id}`;
+  chip.dataset.playerId = player.id;
+  chip.className = 'flex items-center gap-1.5 bg-gray-800 border border-gray-700 rounded-xl px-2.5 py-1.5';
+  chip.innerHTML = `
+    ${avatarHTML(player, 20)}
+    <span class="text-sm text-gray-200">${player.name}</span>
+    <button type="button" onclick="removePlayer(${teamIdx},${player.id})"
+      class="ml-1 text-gray-600 hover:text-red-400 transition text-xs leading-none">✕</button>
+  `;
+  c.appendChild(chip);
 }
 
 function addPlayer(teamIdx) {
@@ -144,22 +169,17 @@ function addPlayer(teamIdx) {
   if (!pid) return;
   const player = PLAYERS.find(p => p.id === pid);
   if (!player) return;
-  if (pid in playerOwner) {
-    showError(`«${player.name}» уже в другой команде.`);
-    sel.value = '';
-    return;
-  }
+  if (pid in playerOwner) { showError(`«${player.name}» уже в другой команде.`); sel.value=''; return; }
   hideError();
   playerOwner[pid] = teamIdx;
-  addChip(teamIdx, pid, player.name);
+  addChip(teamIdx, player);
   sel.value = '';
   refreshAllSelects();
 }
 
 function removePlayer(teamIdx, playerId) {
   delete playerOwner[playerId];
-  const chip = document.getElementById(`chip-${teamIdx}-${playerId}`);
-  if (chip) chip.remove();
+  document.getElementById(`chip-${teamIdx}-${playerId}`)?.remove();
   refreshAllSelects();
 }
 
@@ -168,43 +188,43 @@ function addTeam(preload) {
   const idx = teamCounter;
   document.getElementById('teamsEmpty').classList.add('hidden');
 
+  const noPlayers = PLAYERS.length === 0;
   const div = document.createElement('div');
   div.id = `team-${idx}`;
-  div.className = 'bg-gray-800 border border-gray-700 rounded-xl p-4';
+  div.className = 'bg-gray-800/50 border border-gray-700 rounded-xl p-4';
   div.innerHTML = `
     <div class="flex items-center justify-between mb-3">
-      <span class="text-gray-300 font-medium text-sm">Команда #${idx}</span>
-      <button type="button" onclick="removeTeam(${idx})"
-        class="text-gray-500 hover:text-red-400 text-xs transition">✕ Убрать</button>
-    </div>
-    <div class="grid sm:grid-cols-2 gap-3 mb-3">
-      <div>
-        <label class="block text-gray-400 text-xs mb-1">Название (необяз.)</label>
-        <input type="text" id="teamName-${idx}" placeholder="Команда А"
-          class="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-1.5 text-gray-100
-                 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm">
+      <div class="flex items-center gap-2">
+        <span class="w-6 h-6 bg-gray-700 rounded-lg flex items-center justify-center text-gray-400 text-xs font-bold">${idx}</span>
+        <input type="text" id="teamName-${idx}" placeholder="Название команды (необяз.)"
+          class="bg-transparent text-gray-200 text-sm placeholder-gray-600 border-b border-transparent
+                 hover:border-gray-600 focus:border-violet-500 focus:outline-none pb-0.5 transition w-48">
       </div>
-      <div>
-        <label class="block text-gray-400 text-xs mb-1">Место *</label>
-        <input type="number" id="teamPlace-${idx}" min="1" value="${idx}"
-          class="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-1.5 text-gray-100
-                 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm">
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-1.5">
+          <label class="text-gray-500 text-xs">Место:</label>
+          <input type="number" id="teamPlace-${idx}" min="1" value="${idx}"
+            class="w-14 bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 text-gray-200 text-sm text-center
+                   focus:outline-none focus:ring-2 focus:ring-violet-500">
+        </div>
+        <button type="button" onclick="removeTeam(${idx})"
+          class="text-gray-600 hover:text-red-400 text-xs transition px-2 py-1">✕</button>
       </div>
     </div>
     <div>
-      <label class="block text-gray-400 text-xs mb-2">Игроки</label>
-      <div id="chips-${idx}" class="flex flex-wrap gap-2 mb-2 min-h-[28px]"></div>
-      ${PLAYERS.length === 0
-        ? '<p class="text-gray-500 text-xs">Сначала <a href="/admin/players" class="underline">добавьте игроков</a>.</p>'
+      <div id="chips-${idx}" class="flex flex-wrap gap-2 mb-2 min-h-[32px]"></div>
+      ${noPlayers
+        ? '<p class="text-gray-600 text-xs">Сначала <a href="/admin/players" class="underline text-violet-500">добавьте игроков</a>.</p>'
         : `<div class="flex gap-2">
             <select id="playerSelect-${idx}"
-              class="flex-1 bg-gray-900 border border-gray-600 rounded-lg px-3 py-1.5 text-gray-300
-                     focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm">
+              class="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-gray-400 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer">
               <option value="">— выбрать игрока —</option>
             </select>
             <button type="button" onclick="addPlayer(${idx})"
-              class="bg-violet-700 hover:bg-violet-600 text-white text-sm px-3 py-1.5 rounded-lg transition">
-              + Добавить
+              class="bg-gray-900 hover:bg-gray-800 border border-gray-700 hover:border-violet-600
+                     text-gray-300 text-sm px-4 py-2 rounded-xl transition font-medium">
+              +
             </button>
           </div>`
       }
@@ -213,15 +233,14 @@ function addTeam(preload) {
   document.getElementById('teamsContainer').appendChild(div);
   refreshSelect(idx);
 
-  // Pre-load existing players if provided
   if (preload) {
     if (preload.name) document.getElementById(`teamName-${idx}`).value = preload.name;
     document.getElementById(`teamPlace-${idx}`).value = preload.place;
     (preload.player_ids || []).forEach(pid => {
-      const pname = preload.player_names ? preload.player_names[pid] : (PLAYERS.find(p => p.id === pid) || {}).name;
-      if (!pname) return;
+      const p = PLAYERS.find(x => x.id === pid);
+      if (!p) return;
       playerOwner[pid] = idx;
-      addChip(idx, pid, pname);
+      addChip(idx, p);
     });
     refreshAllSelects();
   }
@@ -230,58 +249,38 @@ function addTeam(preload) {
 function removeTeam(idx) {
   const el = document.getElementById(`team-${idx}`);
   if (!el) return;
-  // Free players owned by this team
   Object.keys(playerOwner).forEach(pid => {
     if (playerOwner[pid] === idx) delete playerOwner[parseInt(pid)];
   });
   el.remove();
   refreshAllSelects();
-  if (document.getElementById('teamsContainer').children.length === 0) {
+  if (document.getElementById('teamsContainer').children.length === 0)
     document.getElementById('teamsEmpty').classList.remove('hidden');
-  }
 }
 
-// ── Form submit ──────────────────────────────────────────────────────────────
+// ── Submit ───────────────────────────────────────────────────────────────────
 document.getElementById('gameForm').addEventListener('submit', function(e) {
   hideError();
   const teams = [];
   document.querySelectorAll('[id^="team-"]').forEach(el => {
     const idx = parseInt(el.id.replace('team-', ''));
-    const name = document.getElementById(`teamName-${idx}`)?.value || '';
+    const name  = document.getElementById(`teamName-${idx}`)?.value || '';
     const place = parseInt(document.getElementById(`teamPlace-${idx}`)?.value || '0');
     const playerIds = [...el.querySelectorAll('[id^="chip-"]')].map(c => parseInt(c.dataset.playerId));
     teams.push({ name, place, player_ids: playerIds });
   });
 
-  if (teams.length === 0) {
-    e.preventDefault();
-    showError('Добавьте хотя бы одну команду.');
-    return;
-  }
-  const places = teams.map(t => t.place);
-  if (new Set(places).size !== places.length) {
-    e.preventDefault();
-    showError('Два места не могут совпадать. Проверьте поля «Место».');
-    return;
-  }
+  if (!teams.length)                            { e.preventDefault(); showError('Добавьте хотя бы одну команду.'); return; }
+  if (new Set(teams.map(t=>t.place)).size !== teams.length) { e.preventDefault(); showError('Два места не могут совпадать.'); return; }
   const allPids = teams.flatMap(t => t.player_ids);
-  if (new Set(allPids).size !== allPids.length) {
-    e.preventDefault();
-    showError('Один игрок не может быть в двух командах.');
-    return;
-  }
+  if (new Set(allPids).size !== allPids.length) { e.preventDefault(); showError('Один игрок не может быть в двух командах.'); return; }
 
   document.getElementById('teamsJson').value = JSON.stringify(teams);
 });
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 document.getElementById('addTeamBtn').addEventListener('click', () => addTeam(null));
-
-if (EXISTING.length > 0) {
-  EXISTING.forEach(t => addTeam(t));
-} else {
-  addTeam(null);
-  addTeam(null);
-}
+if (EXISTING.length > 0) EXISTING.forEach(t => addTeam(t));
+else { addTeam(null); addTeam(null); }
 </script>
 {% endblock %}

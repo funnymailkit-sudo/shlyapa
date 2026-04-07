@@ -1,21 +1,22 @@
 {% extends "base.html" %}
+{% from "macros.html" import avatar %}
 {% block title %}Игры — Шляпа{% endblock %}
 
 {% block content %}
-<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
   <div>
-    <h1 class="text-2xl font-bold text-white">Игры</h1>
+    <h1 class="text-2xl font-extrabold text-white">Игры</h1>
     {% if current_season %}
-      <p class="text-gray-400 text-sm mt-1">Сезон {{ current_season.label }}</p>
+      <p class="text-gray-500 text-sm mt-0.5">Сезон <span class="text-gray-300">{{ current_season.label }}</span></p>
     {% endif %}
   </div>
 
-  <div class="flex items-center gap-3 flex-wrap">
+  <div class="flex items-center gap-2 flex-wrap">
     {% if seasons %}
     <form method="get" class="flex items-center gap-2">
-      <label class="text-gray-400 text-sm">Сезон:</label>
       <select name="season_id" onchange="this.form.submit()"
-        class="bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500">
+        class="bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-xl px-3 py-1.5
+               focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer">
         {% for s in seasons %}
           <option value="{{ s.id }}" {% if current_season and s.id == current_season.id %}selected{% endif %}>
             {{ s.label }}
@@ -25,51 +26,62 @@
     </form>
     {% endif %}
     <a href="/admin/games/new"
-      class="bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition">
+       class="bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold px-4 py-1.5 rounded-xl transition">
       + Новая игра
     </a>
   </div>
 </div>
 
 {% if not games %}
-  <div class="bg-gray-800 border border-gray-700 rounded-2xl p-12 text-center">
-    <p class="text-gray-400 text-lg">В этом сезоне ещё нет игр.</p>
+  <div class="bg-gray-900 border border-gray-800 rounded-2xl p-12 text-center">
+    <p class="text-4xl mb-3">🎩</p>
+    <p class="text-gray-400">В этом сезоне ещё нет игр.</p>
   </div>
 {% else %}
-  <div class="grid gap-4">
+  <div class="flex flex-col gap-3">
     {% for game in games %}
     {% set n = game.teams | length %}
-    {% set winner = game.teams | selectattr("place", "equalto", 1) | first %}
-    <a href="/games/{{ game.id }}"
-      class="bg-gray-900 border border-gray-800 hover:border-gray-600 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4 transition group">
+    {% set winner_team = game.teams | selectattr("place", "equalto", 1) | first %}
 
-      <div class="flex-1">
-        <div class="flex items-center gap-2 mb-1">
-          <span class="text-white font-semibold">{{ game.played_at.strftime('%d.%m.%Y') }}</span>
-          <span class="text-gray-500 text-sm">·</span>
-          <span class="text-gray-400 text-sm">{{ game.location.name }}</span>
-        </div>
-        {% if game.notes %}
-          <p class="text-gray-500 text-xs mt-1">{{ game.notes }}</p>
-        {% endif %}
+    <a href="/games/{{ game.id }}"
+       class="group bg-gray-900 border border-gray-800 hover:border-gray-600 rounded-2xl p-5
+              flex flex-col sm:flex-row sm:items-center gap-4 transition-all hover:shadow-lg hover:shadow-black/30">
+
+      <!-- Date + location -->
+      <div class="sm:w-36 shrink-0">
+        <div class="text-white font-bold">{{ game.played_at.strftime('%d.%m.%Y') }}</div>
+        <div class="text-gray-500 text-xs mt-0.5">{{ game.season.label }}</div>
+        <div class="text-gray-600 text-xs mt-0.5 truncate">📍 {{ game.location.name }}</div>
       </div>
 
-      <div class="flex items-center gap-6 text-sm">
-        <div class="text-center">
-          <div class="text-gray-400 text-xs uppercase tracking-wide">Команд</div>
+      <!-- Team avatars -->
+      <div class="flex-1 flex flex-wrap gap-3">
+        {% for team in game.teams | sort(attribute='place') %}
+        <div class="flex items-center gap-1.5">
+          {% if team.place == 1 %}<span class="text-sm">🥇</span>
+          {% elif team.place == 2 %}<span class="text-sm">🥈</span>
+          {% elif team.place == 3 %}<span class="text-sm">🥉</span>
+          {% else %}<span class="text-gray-600 text-xs font-mono">{{ team.place }}.</span>
+          {% endif %}
+          <div class="flex -space-x-1.5">
+            {% for tp in team.team_players %}
+              {{ avatar(tp.player, 26) }}
+            {% endfor %}
+          </div>
+          {% if team.name %}
+            <span class="text-gray-500 text-xs">{{ team.name }}</span>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Meta -->
+      <div class="flex items-center gap-4 shrink-0 text-right">
+        <div>
+          <div class="text-gray-500 text-xs">Команд</div>
           <div class="text-white font-bold text-lg">{{ n }}</div>
         </div>
-        {% if winner %}
-        <div class="text-center">
-          <div class="text-gray-400 text-xs uppercase tracking-wide">Победитель</div>
-          <div class="text-amber-400 font-semibold">
-            {% if winner.name %}{{ winner.name }}{% else %}
-              {% for tp in winner.team_players %}{{ tp.player.name }}{% if not loop.last %}, {% endif %}{% endfor %}
-            {% endif %}
-          </div>
-        </div>
-        {% endif %}
-        <span class="text-gray-600 group-hover:text-gray-400 transition text-lg">→</span>
+        <span class="text-gray-700 group-hover:text-gray-400 transition text-xl">→</span>
       </div>
     </a>
     {% endfor %}

@@ -1,0 +1,159 @@
+{# ─────────────────────────────────────────────────────────────────────────
+   Shared Jinja2 macros
+   Usage:  {% from "macros.html" import avatar, podium, lb_table %}
+   ───────────────────────────────────────────────────────────────────────── #}
+
+{# ── Avatar ────────────────────────────────────────────────────────────────
+   Generates a coloured initials circle for a player object.
+   size: pixel diameter
+#}
+{% macro avatar(player, size=32) %}
+{% set hue = (player.id * 137) % 360 %}
+{% set fs  = (size * 0.42) | int %}
+<div style="width:{{ size }}px;height:{{ size }}px;min-width:{{ size }}px;background:hsl({{ hue }},60%,42%);"
+     class="rounded-full flex items-center justify-center font-bold text-white shrink-0 select-none ring-2 ring-white/10"
+     title="{{ player.name }}">
+  <span style="font-size:{{ fs }}px;line-height:1;">
+    {{- player.name[0] | upper -}}
+    {%- if ' ' in player.name -%}{{- player.name.split(' ')[1][0] | upper -}}{%- endif -%}
+  </span>
+</div>
+{% endmacro %}
+
+
+{# ── Podium ───────────────────────────────────────────────────────────────
+   Top-3 hero cards (2nd | 1st | 3rd layout).
+   lb: leaderboard list with entries {rank, player, points, wins, win_pct, kpd}
+#}
+{% macro podium(lb) %}
+{% if lb | length >= 1 %}
+<div class="grid grid-cols-3 gap-3 mb-6 items-end">
+
+  {# 2nd place #}
+  {% if lb | length >= 2 %}{% set e = lb[1] %}
+  <div class="bg-gradient-to-b from-gray-700/30 to-transparent border border-gray-600/40
+              rounded-2xl p-4 pb-5 text-center flex flex-col items-center gap-2">
+    <span class="text-2xl">🥈</span>
+    {{ avatar(e.player, 52) }}
+    <a href="/players/{{ e.player.id }}"
+       class="font-semibold text-gray-200 text-sm hover:text-violet-300 transition leading-tight text-center block">
+      {{ e.player.name }}
+    </a>
+    <span class="bg-gray-700/80 text-gray-200 text-xs font-bold px-2.5 py-0.5 rounded-full border border-gray-600/40">
+      {{ e.points }} очков
+    </span>
+    <span class="text-gray-500 text-xs">Win {{ e.win_pct }}% · КПД {{ e.kpd }}%</span>
+  </div>
+  {% else %}<div></div>{% endif %}
+
+  {# 1st place #}
+  {% set e = lb[0] %}
+  <div class="bg-gradient-to-b from-amber-900/50 via-amber-950/20 to-transparent
+              border border-amber-600/50 rounded-2xl p-5 pb-8
+              text-center flex flex-col items-center gap-2 glow-gold relative overflow-hidden">
+    <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(245,158,11,.10),transparent_70%)] pointer-events-none"></div>
+    <span class="text-3xl">🥇</span>
+    {{ avatar(e.player, 64) }}
+    <a href="/players/{{ e.player.id }}"
+       class="font-extrabold text-amber-200 hover:text-amber-100 transition leading-tight text-center block">
+      {{ e.player.name }}
+    </a>
+    <span class="bg-amber-500/20 text-amber-300 text-sm font-bold px-3 py-0.5 rounded-full border border-amber-500/30">
+      {{ e.points }} очков
+    </span>
+    <span class="text-amber-600/80 text-xs">Win {{ e.win_pct }}% · КПД {{ e.kpd }}%</span>
+  </div>
+
+  {# 3rd place #}
+  {% if lb | length >= 3 %}{% set e = lb[2] %}
+  <div class="bg-gradient-to-b from-amber-950/30 to-transparent border border-amber-900/40
+              rounded-2xl p-4 pb-5 text-center flex flex-col items-center gap-2">
+    <span class="text-2xl">🥉</span>
+    {{ avatar(e.player, 52) }}
+    <a href="/players/{{ e.player.id }}"
+       class="font-semibold text-amber-700/90 text-sm hover:text-amber-600 transition leading-tight text-center block">
+      {{ e.player.name }}
+    </a>
+    <span class="bg-amber-950/50 text-amber-700 text-xs font-bold px-2.5 py-0.5 rounded-full border border-amber-900/40">
+      {{ e.points }} очков
+    </span>
+    <span class="text-gray-600 text-xs">Win {{ e.win_pct }}% · КПД {{ e.kpd }}%</span>
+  </div>
+  {% else %}<div></div>{% endif %}
+
+</div>
+{% endif %}
+{% endmacro %}
+
+
+{# ── Leaderboard table ────────────────────────────────────────────────────
+   Full ranked table with avatar, stats, coloured badges.
+#}
+{% macro lb_table(lb) %}
+<div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="bg-gray-800/80 text-gray-500 uppercase text-xs tracking-wider">
+        <th class="px-4 py-3 text-left w-10">#</th>
+        <th class="px-4 py-3 text-left">Игрок</th>
+        <th class="px-4 py-3 text-right">Игры</th>
+        <th class="px-4 py-3 text-right hidden sm:table-cell">Победы</th>
+        <th class="px-4 py-3 text-right hidden sm:table-cell">Win%</th>
+        <th class="px-4 py-3 text-right hidden sm:table-cell">КПД</th>
+        <th class="px-4 py-3 text-right">Очки</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-800">
+      {% for e in lb %}
+      <tr class="table-row
+        {% if e.rank == 1 %}bg-amber-950/20
+        {% elif e.rank == 2 %}bg-gray-800/20
+        {% elif e.rank == 3 %}bg-amber-950/10{% endif %}">
+
+        <td class="px-4 py-3 text-center w-10">
+          {% if e.rank == 1 %}<span class="text-lg leading-none">🥇</span>
+          {% elif e.rank == 2 %}<span class="text-lg leading-none">🥈</span>
+          {% elif e.rank == 3 %}<span class="text-lg leading-none">🥉</span>
+          {% else %}<span class="text-gray-600 font-mono text-xs">{{ e.rank }}</span>{% endif %}
+        </td>
+
+        <td class="px-4 py-3">
+          <a href="/players/{{ e.player.id }}" class="flex items-center gap-2.5 group w-fit">
+            {{ avatar(e.player, 28) }}
+            <span class="font-medium text-gray-200 group-hover:text-violet-300 transition">{{ e.player.name }}</span>
+          </a>
+        </td>
+
+        <td class="px-4 py-3 text-right text-gray-500 tabular-nums">{{ e.games }}</td>
+        <td class="px-4 py-3 text-right text-gray-500 tabular-nums hidden sm:table-cell">{{ e.wins }}</td>
+
+        <td class="px-4 py-3 text-right tabular-nums hidden sm:table-cell">
+          <span class="text-xs {% if e.win_pct >= 50 %}text-green-400{% else %}text-gray-500{% endif %}">
+            {{ e.win_pct }}%
+          </span>
+        </td>
+
+        <td class="px-4 py-3 text-right tabular-nums hidden sm:table-cell">
+          <span class="text-xs
+            {% if e.kpd >= 65 %}text-emerald-400
+            {% elif e.kpd >= 45 %}text-yellow-400
+            {% else %}text-gray-500{% endif %}">
+            {{ e.kpd }}%
+          </span>
+        </td>
+
+        <td class="px-4 py-3 text-right">
+          <span class="font-bold px-2.5 py-0.5 rounded-full text-xs border
+            {% if e.rank == 1 %}bg-amber-500/20 text-amber-300 border-amber-500/30
+            {% elif e.rank == 2 %}bg-gray-700/50 text-gray-300 border-gray-600/30
+            {% elif e.rank == 3 %}bg-amber-900/20 text-amber-700 border-amber-900/30
+            {% else %}bg-violet-900/20 text-violet-400 border-violet-800/30{% endif %}">
+            {{ e.points }}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endmacro %}
