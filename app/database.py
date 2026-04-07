@@ -5,13 +5,16 @@ from sqlalchemy import (Column, DateTime, ForeignKey, Integer, String, Text,
                         create_engine)
 from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
-# Use DATABASE_URL env var in production (PostgreSQL on Supabase/Render),
-# fall back to local SQLite for development.
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./shlyapa.db")
+# Use DATABASE_URL env var in production (PostgreSQL), fall back to SQLite.
+_raw = os.environ.get("DATABASE_URL", "")
 
-# Supabase/Heroku sometimes give postgres:// — SQLAlchemy needs postgresql://
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+# Normalize postgres:// → postgresql:// (Supabase/Heroku quirk)
+if _raw.startswith("postgres://"):
+    _raw = _raw.replace("postgres://", "postgresql://", 1)
+
+# Accept only known schemes; ignore any garbage value (e.g. wrong API keys)
+_VALID = ("postgresql://", "postgresql+", "sqlite")
+DATABASE_URL = _raw if any(_raw.startswith(s) for s in _VALID) else "sqlite:///./shlyapa.db"
 
 _is_sqlite = DATABASE_URL.startswith("sqlite")
 
